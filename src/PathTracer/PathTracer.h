@@ -47,11 +47,7 @@ namespace pt
     {
         uint32_t vertex_count;      // number of vertices within the mesh
         VkFormat vertex_format;     // format of vertices = VK_FORMAT_R32G32B32_SFLOAT
-                                    // Therefore a stride is not needed to be stored as it
-                                    // can be gotten by calling format_sizeof() in VKA.
-        uint32_t attribute_stride;  // For the attributes is a stride needed, as this contains
-                                    // every other scene information like normal vectors and
-                                    // texture coordinates
+        size_t vertex_stride;       // the size of one vertex
         uint32_t index_count;       // number of indices of the mesh
         RecordParameter record;     // Per-mesh/geometry parameter for the SBT record.
     };
@@ -127,6 +123,7 @@ namespace pt
     private:
         bool initialized;
         const Setup* setup;
+        std::string environment_path;
         std::vector<std::string> model_paths;
         loadmsg_callback_t texture_load_callback;
         loadmsg_callback_t model_load_callback;
@@ -136,6 +133,7 @@ namespace pt
 
         model_array_t models;
         material_array_t materials; // all the texture-materials
+        vka::Texture environment;
         vka::Buffer mtl_buffer;     // all the single-value-materials
         vka::Buffer tlibo;          // buffer object that holds the instances for the tlas
 
@@ -164,6 +162,7 @@ namespace pt
         void load_mtl_buffer(const material_array_t& mtlarray);
         void load_emissive_texture(RenderMaterial& mtl);
         void load_arman_texture(RenderMaterial& mtl);
+        void load_environment_texture(void);
         void load_geometry(std::vector<VkGeometryNV>& geometry);
         void load_instances(const AccelerationStructure& blas);
         void load_blas(const std::vector<VkGeometryNV>& geometry, AccelerationStructure& blas);
@@ -205,6 +204,18 @@ namespace pt
          * @brief destroys all internal objects of the path tracer
          */
         void destroy(void);
+        
+        /**
+         * @brief       Loads an environment map.
+         * @param path  Path to the environment image.
+         * @note        The environment map is requiered for this application.
+         *              If you decide not to load one, the application won't start.
+         *              Additionally, only one environment map will be loaded.
+         *              If 'load_environment' is called multiple times, only the 
+         *              path to the file will be overwritten.
+         *              The environment map must be an equirectangular map in the HDR image format.
+         */
+        void load_environment(const std::string& path);
 
         /**
          * @brief       Loads a model from an object file.

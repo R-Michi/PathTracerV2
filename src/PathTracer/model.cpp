@@ -71,10 +71,18 @@ void pt::PathTracer::create_render_models(void)
 
 void pt::PathTracer::load_render_mesh(const vka::Mesh& mesh, RenderMesh& rmesh)
 {
-    static const std::vector<vka::VertexAttributeType> merge_attribs = {
-        vka::VKA_VERTEX_ATTRIBUTE_TYPE_NORMAL,
-        vka::VKA_VERTEX_ATTRIBUTE_TYPE_TEXTURE_COORDINATE  
+    static const std::vector<vka::VertexAttribute> merge_vertices = {
+        { vka::VKA_VERTEX_ATTRIBUTE_TYPE_NORMAL, 1} // vertex positions have 3 components, since vec3 inside storage buffers have an alignment of 16, one spacing float is requiered
     };
+
+    static const std::vector<vka::VertexAttribute> merge_attribs = {
+        { vka::VKA_VERTEX_ATTRIBUTE_TYPE_NORMAL, 1},    // normal vectors have 3 components, since vec3 inside storage buffers have an alignment of 16, one spacing float is requiered
+        { vka::VKA_VERTEX_ATTRIBUTE_TYPE_TEXTURE_COORDINATE, 0}
+    };
+
+    std::vector<float> vertices;
+    mesh.merge(vertices, merge_vertices);
+    const size_t vertex_size = vertices.size() * sizeof(float);
 
     std::vector<float> vertex_attributes;
     mesh.merge(vertex_attributes, merge_attribs);
@@ -95,7 +103,7 @@ void pt::PathTracer::load_render_mesh(const vka::Mesh& mesh, RenderMesh& rmesh)
     // partly initialize the mesh propertis, the other part is initialized inside create_render_buffers
     rmesh.properties.vertex_count       = mesh.vertex_count();
     rmesh.properties.vertex_format      = VK_FORMAT_R32G32B32_SFLOAT;
-    rmesh.properties.attribute_stride   = (mesh.normal_component_count() + mesh.texcoord_component_count()) * sizeof(float);
+    rmesh.properties.vertex_stride      = (1 + mesh.vertex_component_count()) * sizeof(float);
     rmesh.properties.index_count        =  mesh.index_count();
     // the vertex attribute consists of a normal vector (XYZ) and a texture coordinate (UV) and the size of one component = sizeof(float)
     // -> (size of attribute) = (number of components) * (size of one component)
@@ -115,7 +123,7 @@ void pt::PathTracer::load_render_mesh(const vka::Mesh& mesh, RenderMesh& rmesh)
         staging[i].set_device(this->setup->get_device());
         staging[i].set_physical_device(this->setup->get_physical_device());
     }
-    staging[0].set_create_size(mesh.vertex_size());
+    staging[0].set_create_size(vertex_size);
     staging[1].set_create_size(attrib_size);
     staging[2].set_create_size(mesh.indices_size());
 
@@ -131,7 +139,7 @@ void pt::PathTracer::load_render_mesh(const vka::Mesh& mesh, RenderMesh& rmesh)
     #pragma unroll_completely
     for(uint32_t i = 0; i < 3; i++) map[i] = staging[i].map(staging[i].size(), 0);
 
-    memcpy(map[0], mesh.pvertices(),            staging[0].size());
+    memcpy(map[0], vertices.data(),             staging[0].size());
     memcpy(map[1], vertex_attributes.data(),    staging[1].size());
     memcpy(map[2], mesh.pindices(),             staging[2].size());
 

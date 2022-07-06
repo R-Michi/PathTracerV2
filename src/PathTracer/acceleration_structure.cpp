@@ -23,7 +23,7 @@ void pt::PathTracer::load_geometry(std::vector<VkGeometryNV>& geometry)
             triangles.vertexData = mesh.vectices.handle();
             triangles.vertexOffset = 0;
             triangles.vertexCount = mesh.properties.vertex_count;
-            triangles.vertexStride = vka::utility::format_sizeof(mesh.properties.vertex_format);
+            triangles.vertexStride = mesh.properties.vertex_stride;
             triangles.vertexFormat = mesh.properties.vertex_format;
             triangles.indexData = mesh.indices.handle();
             triangles.indexOffset = 0;

@@ -22,7 +22,9 @@ void pt::PathTracer::create_descriptors(void)
     this->descriptors.add_binding(1, 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, this->materials.size(), VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV);
     this->descriptors.add_binding(1, 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, this->materials.size(), VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV);
     this->descriptors.add_binding(1, 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, this->materials.size(), VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV);
-    this->descriptors.init();
+    this->descriptors.add_binding(1, 7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_MISS_BIT_NV);
+    if(this->descriptors.init() != VK_SUCCESS)
+        throw std::runtime_error("[pt::PathTracer::create_descriptors]: Failed to initialize descriptors.");
     
     // location (set = 0, binding = 0) contains the output image of the path tracer
     VkDescriptorImageInfo out_image_info = {};
@@ -118,6 +120,13 @@ void pt::PathTracer::create_descriptors(void)
 
     for(uint32_t i = 0; i < 4; i++)
         this->descriptors.write_image_info(1, i + 3, 0, this->materials.size(), material_infos.data() + i * this->materials.size());
+
+    // location (set = 1, binding = 7) contains the environment map
+    VkDescriptorImageInfo environment_info = {};
+    environment_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    environment_info.imageView = this->environment.views().at(0);
+    environment_info.sampler = this->environment.sampler();
+    this->descriptors.write_image_info(1, 7, 0, 1, &environment_info);
 
     // update descriptors
     this->descriptors.update();

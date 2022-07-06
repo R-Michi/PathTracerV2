@@ -9,6 +9,11 @@
     #include <stb/stb_image.h>
 #endif
 
+void pt::PathTracer::load_environment(const std::string& path)
+{
+    this->environment_path = path;
+}
+
 void pt::PathTracer::create_render_materials(void)
 {
     // load the non-texture materials into a uniform buffer
@@ -28,6 +33,10 @@ void pt::PathTracer::create_render_materials(void)
         mtl.properties.map_normal.clear();
         mtl.properties.map_roughness.clear();
     }
+
+    // load the environment map texture
+    this->load_environment_texture();
+    this->environment_path.clear();
 }
 
 void pt::PathTracer::load_mtl_buffer(const material_array_t& mtlarray)
@@ -212,6 +221,51 @@ void pt::PathTracer::load_arman_texture(RenderMaterial& mtl)
     if(tex.create(true, VK_FILTER_NEAREST) != VK_SUCCESS)
         throw std::runtime_error("[pt::PathTracer::load_emissive_texture]: Failed to create arman texture.");
 
+}
+
+void pt::PathTracer::load_environment_texture(void)
+{
+    VkExtent3D extent;
+    int w, h;
+    float* data = stbi_loadf(this->environment_path.c_str(), &w, &h, nullptr, 4);
+    if(data == nullptr)
+        throw std::runtime_error("[pt::PathTracer::load_environment_texture]: Failed to load environment image: " + this->environment_path);
+
+    extent.width    = static_cast<uint32_t>(w);
+    extent.height   = static_cast<uint32_t>(h);
+    extent.depth    = 1;
+
+    this->init_texture(this->environment);
+    this->environment.set_image_format(VK_FORMAT_R32G32B32A32_SFLOAT);
+    this->environment.set_image_extent(extent);
+    this->environment.set_image_array_layers(1);
+    this->environment.set_sampler_lod(0.0f, 0.0f);
+
+    VkComponentMapping component_mapping = {};
+    component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    VkImageViewCreateInfo view;
+    view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view.pNext = nullptr;
+    view.flags = 0;
+    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    view.components = component_mapping;
+    view.subresourceRange.baseArrayLayer = 0;
+    view.subresourceRange.layerCount = 1;
+
+    this->environment.add_view(view);
+    if(this->environment.load(0, data) != VK_SUCCESS)
+        throw std::runtime_error("[pt::PathTracer::load_emissive_texture]: Failed to load environment image into texture.");
+    stbi_image_free(data);
+
+    if(this->environment.create(false, VK_FILTER_NEAREST) != VK_SUCCESS)
+        throw std::runtime_error("[pt::PathTracer::load_emissive_texture]: Failed to create environment texture.");
+
+    if(this->texture_load_callback != nullptr) this->texture_load_callback(this->environment_path);
 }
 
 void pt::PathTracer::init_texture(vka::Texture& tex)

@@ -52,7 +52,8 @@ int main()
         path_tracer.set_model_load_callback(on_model_load);
         path_tracer.set_texture_load_callback(on_texture_load);
 
-        // load models
+        // load models and environment map
+        path_tracer.load_environment("../assets/environment/environment3.hdr");
         path_tracer.load_model("../assets/models/test.obj");
 
         // initialize setup

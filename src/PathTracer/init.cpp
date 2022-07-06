@@ -71,6 +71,7 @@ void pt::PathTracer::destroy(void)
         mtl.texture.arman.clear();
         mtl.texture.emission.clear();
     }
+    this->environment.clear();
 
     // destroy render models
     for(auto& model : this->models)

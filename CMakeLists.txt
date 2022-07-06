@@ -10,7 +10,7 @@ add_compile_options(-mf16c -mfma -mavx2)
 
 #add include directories
 include_directories("C:/VulkanSDK/1.2.170.0/Include")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/vka-1.3.1")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/vka-1.3.2")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/stb_master")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/tiny_obj_loader")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/glm2")

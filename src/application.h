@@ -1,7 +1,7 @@
 #pragma once
 
 #define VKA_GLFW_DISABLE
-//#define VKA_DEBUG
+#define VKA_DEBUG
 
 #include <stdexcept>
 #include <vector>

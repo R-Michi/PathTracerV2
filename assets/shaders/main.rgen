@@ -2,9 +2,51 @@
 #extension GL_NV_ray_tracing : require
 #extension GL_GOOGLE_include_directive : enable
 
+#include "types.glsl"
 #include "layout_rgen.glsl"
+#include "common_rgen.glsl"
 
 void main()
 {
-    imageStore(rop, ivec2(gl_LaunchIDNV), vec4(0.0f, 0.0f, 1.0f, 1.0f));
+    // One camera ray is shooted through one pixel.
+    // To combute those camera rays, the focal point is sbtracted from
+    // the position of the image plane (camera lense). The X,Y coorinates of the
+    // camera lense equals to the NDC and the Z cooirdinate is always 0.
+    // The two parameters, the focal length (f) and the view angle (phi), also refered to as FOV,
+    // can be calculated with following formulas:
+    // f = 1 / tan(phi / 2)
+    // phi = 2 * arctan(1 / f)
+    // For this application a phi = 90 therefore f = 1.
+    const vec3 camera_lense_pos = vec3(get_NDC(), 0.0f);                        // postion on the camera lense
+    const vec3 focal_point      = vec3(0.0f, 0.0f, -1.0f);                      // focal point of the camera
+    const vec3 camera_rd        = normalize(camera_lense_pos - focal_point);    // camera ray direction, must be normalized
+
+    // The camera has 3 ptoperties, 1. the facing drection, 2. the position in the virtual world and
+    // 3. the up direction. We can combute the final ray direction by transforming
+    // the normalized camera ray direction to the facing direction of our camera.
+    // The facing direction is established by defining a point where the camera should point to.
+    const vec3 origin   = vec3(0.0f, 0.0f, -5.0f);
+    const vec3 view_pos = vec3(0.0f, 0.0f, 0.0f);
+    const vec3 up       = vec3(0.0f, 1.0f, 0.0f);
+    ray_t ray;
+    ray.origin      = origin;
+    ray.direction   = combute_direction(normalize(view_pos - origin), up, camera_rd);
+
+    // trace a ray
+    traceNV(
+        tlas,               // top level acceleration structure
+        gl_RayFlagsOpaqueNV,// ray flags
+        0xFF,               // cull mask
+        0,                  // Offset within the hit-group records of ONE geometry.
+        1,                  // Number of hit-group records of per geometry.
+        0,                  // Miss record offset.
+        ray.origin,         // ray origin
+        0.0f,               // t min
+        ray.direction,      // ray origin
+        100.0f,             // t max
+        0                   // payload location
+    );
+
+    // after the trace the payload contains the color returned by the closest hit or the miss shader.
+    imageStore(rop, ivec2(gl_LaunchIDNV), vec4(payload.color, 1.0f));
 }

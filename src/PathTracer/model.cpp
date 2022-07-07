@@ -72,7 +72,7 @@ void pt::PathTracer::create_render_models(void)
 void pt::PathTracer::load_render_mesh(const vka::Mesh& mesh, RenderMesh& rmesh)
 {
     static const std::vector<vka::VertexAttribute> merge_vertices = {
-        { vka::VKA_VERTEX_ATTRIBUTE_TYPE_NORMAL, 1} // vertex positions have 3 components, since vec3 inside storage buffers have an alignment of 16, one spacing float is requiered
+        { vka::VKA_VERTEX_ATTRIBUTE_TYPE_POSITION, 1}   // vertex positions have 3 components, since vec3 inside storage buffers have an alignment of 16, one spacing float is requiered
     };
 
     static const std::vector<vka::VertexAttribute> merge_attribs = {
@@ -89,7 +89,7 @@ void pt::PathTracer::load_render_mesh(const vka::Mesh& mesh, RenderMesh& rmesh)
     const size_t attrib_size = vertex_attributes.size() * sizeof(float);
 
     // init vertex buffer
-    rmesh.vectices.set_create_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    rmesh.vectices.set_create_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     rmesh.vectices.set_memory_properties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     // init attribute buffer
@@ -97,7 +97,7 @@ void pt::PathTracer::load_render_mesh(const vka::Mesh& mesh, RenderMesh& rmesh)
     rmesh.attributes.set_memory_properties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     // init index buffer
-    rmesh.indices.set_create_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    rmesh.indices.set_create_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     rmesh.indices.set_memory_properties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     // partly initialize the mesh propertis, the other part is initialized inside create_render_buffers

@@ -22,8 +22,9 @@ void pt::PathTracer::create_render_materials(void)
     // load every texture material
     for(RenderMaterial& mtl : this->materials)
     {
+        this->load_albedo_texture(mtl);
         this->load_emissive_texture(mtl);
-        this->load_arman_texture(mtl);
+        this->load_rman_texture(mtl);
 
         // delete all texture string paths to free memory
         mtl.properties.map_albedo.clear();
@@ -70,14 +71,58 @@ void pt::PathTracer::load_mtl_buffer(const material_array_t& mtlarray)
         throw std::runtime_error("[pt::PathTracer::load_mtl_buffer]: Failed to copy staging buffer.");
 }
 
-void pt::PathTracer::load_emissive_texture(RenderMaterial& mtl)
+void pt::PathTracer::load_albedo_texture(RenderMaterial& mtl)
 {
-    vka::Texture& tex = mtl.texture.emission;
+    constexpr static VkFormat ALBEDO_FORMAT = VK_FORMAT_R8G8B8A8_SRGB; // albedo map uses SRGB non linear color space
+    vka::Texture& tex = mtl.texture.albedo;
+
+    VkExtent3D extent;
+    int w, h;
+    uint8_t* data = stbi_load(mtl.properties.map_albedo.c_str(), &w, &h, nullptr, 4);
+    if(data == nullptr)
+        throw std::runtime_error("[pt::PathTracer::load_albedo_texture]: Failed to load albedo map: " + mtl.properties.map_emission);
+
+    extent.width    = static_cast<uint32_t>(w);
+    extent.height   = static_cast<uint32_t>(h);
+    extent.depth    = 1;
+
+    this->init_texture(tex);
+    tex.set_image_format(ALBEDO_FORMAT);
+    tex.set_image_extent(extent);
+    tex.set_image_array_layers(1);
+    tex.set_sampler_lod(0.0f, vka::Texture::to_mip_levels(extent));
+
     VkComponentMapping component_mapping = {};
     component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    VkImageViewCreateInfo view;
+    view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view.pNext = nullptr;
+    view.flags = 0;
+    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view.format = ALBEDO_FORMAT;
+    view.components = component_mapping;
+    view.subresourceRange.baseArrayLayer = 0;
+    view.subresourceRange.layerCount = 1;
+
+    tex.add_view(view);
+    if(tex.load(0, data) != VK_SUCCESS)
+        throw std::runtime_error("[pt::PathTracer::load_albedo_texture]: Failed to load emissive image into texture.");
+    stbi_image_free(data);
+
+    if(tex.create(true, VK_FILTER_NEAREST) != VK_SUCCESS)
+        throw std::runtime_error("[pt::PathTracer::load_albedo_texture]: Failed to create emissive texture.");
+
+    if(this->texture_load_callback != nullptr) this->texture_load_callback(mtl.properties.map_albedo);
+}
+
+void pt::PathTracer::load_emissive_texture(RenderMaterial& mtl)
+{
+    constexpr static VkFormat EMISSION_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;
+    vka::Texture& tex = mtl.texture.emission;
 
     // load textue
     // If instead of a textrue there is only a single value,
@@ -105,17 +150,23 @@ void pt::PathTracer::load_emissive_texture(RenderMaterial& mtl)
     }
 
     this->init_texture(tex);
-    tex.set_image_format(VK_FORMAT_R32G32B32A32_SFLOAT);   // emission map is a HDR texture
+    tex.set_image_format(EMISSION_FORMAT);   // emission map is a HDR texture
     tex.set_image_extent(extent);
     tex.set_image_array_layers(1);
     tex.set_sampler_lod(0.0f, vka::Texture::to_mip_levels(extent));
+
+    VkComponentMapping component_mapping = {};
+    component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
     VkImageViewCreateInfo view;
     view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     view.pNext = nullptr;
     view.flags = 0;
     view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    view.format = EMISSION_FORMAT;
     view.components = component_mapping;
     view.subresourceRange.baseArrayLayer = 0;
     view.subresourceRange.layerCount = 1;
@@ -131,32 +182,20 @@ void pt::PathTracer::load_emissive_texture(RenderMaterial& mtl)
     if(this->texture_load_callback != nullptr) this->texture_load_callback(mtl.properties.map_emission);
 }
 
-void pt::PathTracer::load_arman_texture(RenderMaterial& mtl)
+void pt::PathTracer::load_rman_texture(RenderMaterial& mtl)
 {
-    vka::Texture& tex = mtl.texture.arman;
-    VkComponentMapping component_mapping = {};
-    component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    constexpr static VkFormat RMAN_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
+    vka::Texture& tex = mtl.texture.rman;
 
-    // data[0]: albedo image data
-    // data[1]: roughness, metallic, alpha image data
-    // data[2]: normal image data
-    uint8_t* data[3];
+    // data[0]: roughness, metallic, alpha image data
+    // data[1]: normal image data
+    uint8_t* data[2];
 
     VkExtent3D extent;
     int w1, w2, h1, h2;
-    data[0] = stbi_load(mtl.properties.map_albedo.c_str(), &w1, &h1, nullptr, 4);
-    if(data[0] == nullptr)
-        throw std::runtime_error("[pt::PathTracer::load_arman_texture]: Failed to load albedo image: " + mtl.properties.map_albedo);
-    if(this->texture_load_callback != nullptr) this->texture_load_callback(mtl.properties.map_albedo);
-    
-    data[2] = stbi_load(mtl.properties.map_normal.c_str(), &w2, &h2, nullptr, 4);
-    if(data[2] == nullptr)
-        throw std::runtime_error("[pt::PathTracer::load_arman_texture]: Failed to load normal map image: " + mtl.properties.map_normal);
-    if(w1 != w2 || h1 != h2)
-        throw std::runtime_error("[pt::PathTracer::load_arman_texture]: All images from the same material MUST have the same extent.");
+    data[1] = stbi_load(mtl.properties.map_normal.c_str(), &w1, &h1, nullptr, 4);
+    if(data[1] == nullptr)
+        throw std::runtime_error("[pt::PathTracer::load_arman_texture]: Failed to load normal map: " + mtl.properties.map_normal);
     if(this->texture_load_callback != nullptr) this->texture_load_callback(mtl.properties.map_normal);
 
     // tmp[0] = roughnes image data
@@ -165,66 +204,74 @@ void pt::PathTracer::load_arman_texture(RenderMaterial& mtl)
     uint8_t* tmp[3];
     tmp[0] = stbi_load(mtl.properties.map_roughness.c_str(), &w2, &h2, nullptr, 1);
     if(tmp[0] == nullptr)
-        throw std::runtime_error("[pt::PathTracer::load_arman_texture]: Failed to load roughness map image: " + mtl.properties.map_roughness);
+        throw std::runtime_error("[pt::PathTracer::load_arman_texture]: Failed to load roughness map: " + mtl.properties.map_roughness);
     if(w1 != w2 || h1 != h2)
         throw std::runtime_error("[pt::PathTracer::load_arman_texture]: All images from the same material MUST have the same extent.");
     if(this->texture_load_callback != nullptr) this->texture_load_callback(mtl.properties.map_roughness);
 
     tmp[1] = stbi_load(mtl.properties.map_metallic.c_str(), &w2, &h2, nullptr, 1);
     if(tmp[1] == nullptr)
-        throw std::runtime_error("[pt::PathTracer::load_arman_texture]: Failed to load metallic map image: " + mtl.properties.map_metallic);
+        throw std::runtime_error("[pt::PathTracer::load_arman_texture]: Failed to load metallic map: " + mtl.properties.map_metallic);
     if(w1 != w2 || h1 != h2)
         throw std::runtime_error("[pt::PathTracer::load_arman_texture]: All images from the same material MUST have the same extent.");
     if(this->texture_load_callback != nullptr) this->texture_load_callback(mtl.properties.map_metallic);
 
     tmp[2] = stbi_load(mtl.properties.map_alpha.c_str(), &w2, &h2, nullptr, 1);
     if(tmp[2] == nullptr)
-        throw std::runtime_error("[pt::PathTracer::load_arman_texture]: Failed to load alpha map image: " + mtl.properties.map_alpha);
+        throw std::runtime_error("[pt::PathTracer::load_arman_texture]: Failed to load alpha map: " + mtl.properties.map_alpha);
     if(w1 != w2 || h1 != h2)
         throw std::runtime_error("[pt::PathTracer::load_arman_texture]: All images from the same material MUST have the same extent.");
     if(this->texture_load_callback != nullptr) this->texture_load_callback(mtl.properties.map_alpha);
     
     extent = {static_cast<uint32_t>(w1), static_cast<uint32_t>(h1), 1};
     // merge roughness, metallic and alpha
-    data[1] = new uint8_t[extent.width * extent.height * 4];
+    data[0] = new uint8_t[extent.width * extent.height * 4];
     for(uint32_t i = 0; i < 3; i++)
     {
         for(uint32_t j = 0; j < (extent.width * extent.height); j++)
-            data[1][j * 4 + i] = tmp[i][j];
+            data[0][j * 4 + i] = tmp[i][j];
         stbi_image_free(tmp[i]);
     }
 
     this->init_texture(tex);
-    tex.set_image_format(VK_FORMAT_R8G8B8A8_UNORM);   // emission map is a HDR texture
+    tex.set_image_format(RMAN_FORMAT);
     tex.set_image_extent(extent);
-    tex.set_image_array_layers(3);
+    tex.set_image_array_layers(2);
     tex.set_sampler_lod(0.0f, vka::Texture::to_mip_levels(extent));
+
+    VkComponentMapping component_mapping = {};
+    component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
     VkImageViewCreateInfo view;
     view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     view.pNext = nullptr;
     view.flags = 0;
     view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view.format = VK_FORMAT_R8G8B8A8_UNORM;
+    view.format = RMAN_FORMAT;
     view.components = component_mapping;
     view.subresourceRange.layerCount = 1;
 
-    for(uint32_t i = 0; i < 3; i++)
+    for(uint32_t i = 0; i < 2; i++)
     {
         view.subresourceRange.baseArrayLayer = i;
         tex.add_view(view);
         if(tex.load(i, data[i]) != VK_SUCCESS)
-            throw std::runtime_error("[pt::PathTracer::load_emissive_texture]: Failed to load arman image into texture.");
+            throw std::runtime_error("[pt::PathTracer::load_emissive_texture]: Failed to load rman maps into texture.");
         stbi_image_free(data[i]);
     }
 
     if(tex.create(true, VK_FILTER_NEAREST) != VK_SUCCESS)
-        throw std::runtime_error("[pt::PathTracer::load_emissive_texture]: Failed to create arman texture.");
+        throw std::runtime_error("[pt::PathTracer::load_emissive_texture]: Failed to create rman texture.");
 
 }
 
 void pt::PathTracer::load_environment_texture(void)
 {
+    constexpr static VkFormat ENVIRONMENT_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT; // environment map is an HDR image
+
     VkExtent3D extent;
     int w, h;
     float* data = stbi_loadf(this->environment_path.c_str(), &w, &h, nullptr, 4);
@@ -236,7 +283,7 @@ void pt::PathTracer::load_environment_texture(void)
     extent.depth    = 1;
 
     this->init_texture(this->environment);
-    this->environment.set_image_format(VK_FORMAT_R32G32B32A32_SFLOAT);
+    this->environment.set_image_format(ENVIRONMENT_FORMAT);  
     this->environment.set_image_extent(extent);
     this->environment.set_image_array_layers(1);
     this->environment.set_sampler_lod(0.0f, 0.0f);
@@ -252,7 +299,7 @@ void pt::PathTracer::load_environment_texture(void)
     view.pNext = nullptr;
     view.flags = 0;
     view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    view.format = ENVIRONMENT_FORMAT;
     view.components = component_mapping;
     view.subresourceRange.baseArrayLayer = 0;
     view.subresourceRange.layerCount = 1;

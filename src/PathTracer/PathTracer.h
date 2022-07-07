@@ -85,19 +85,23 @@ namespace pt
     // Stored within this structure are all texture material parameters.
     struct RenderMaterialTexture
     {
-        // Array layer 0:   albedo image [RGB]
-        //                  (unused [A], is needed for the format)
-        // Array layer 1:   roughness image [R]
+        // Array layer 0:   albedo map [sRGB]
+        //                  8bit image format
+        vka::Texture albedo;
+
+        // Array layer 0;   emission map [RGB]
+        //                  32bit image format
+        //                  (unsed [A], is needed for the format)
+        vka::Texture emission;
+
+        // Array layer 0:   roughness image [R]
         //                  metallic image [G]
         //                  alpha image [B]
         //                  (unused [A], is needed for the format)
-        // Array layer 2:   normal map [RGB]
+        // Array layer 1:   normal map [RGB]
         //                  (unused [A], is needed for the format)
-        vka::Texture arman;
-
-        // Array layer 0:   emission image [RGB]
-        //                  (unsed [A], is needed for the format)
-        vka::Texture emission;
+        //                  8bit image format
+        vka::Texture rman;
     };
 
     struct RenderMaterial
@@ -133,7 +137,7 @@ namespace pt
 
         model_array_t models;
         material_array_t materials; // all the texture-materials
-        vka::Texture environment;
+        vka::Texture environment;   // environment map (equirectangular map), 32bit image format
         vka::Buffer mtl_buffer;     // all the single-value-materials
         vka::Buffer tlibo;          // buffer object that holds the instances for the tlas
 
@@ -160,8 +164,9 @@ namespace pt
 
         void load_render_mesh(const vka::Mesh& mesh, RenderMesh& rmesh);
         void load_mtl_buffer(const material_array_t& mtlarray);
+        void load_albedo_texture(RenderMaterial& mtl);
         void load_emissive_texture(RenderMaterial& mtl);
-        void load_arman_texture(RenderMaterial& mtl);
+        void load_rman_texture(RenderMaterial& mtl);
         void load_environment_texture(void);
         void load_geometry(std::vector<VkGeometryNV>& geometry);
         void load_instances(const AccelerationStructure& blas);
@@ -173,7 +178,17 @@ namespace pt
         VkCommandBuffer record(void);
         void trace(VkCommandBuffer cbo);
 
-        inline VkTransformMatrixNV glm2transformNV(const glm2::mat4& mat)
+        static inline glm2::mat4 identity_transform(void)
+        {
+            return glm2::mat4(
+                1.0f, 0.0f, 0.0f, 0.0f,
+                0.0f, 1.0f, 0.0f, 0.0f,
+                0.0f, 0.0f, 1.0f, 0.0f,
+                0.0f, 0.0f, 0.0f, 1.0f
+            );
+        }
+
+        static inline VkTransformMatrixNV glm2transformNV(const glm2::mat4& mat)
         {
             VkTransformMatrixNV ret;
             const glm2::mat3x4 r43 = glm2::transpose((glm2::mat4x3)mat);

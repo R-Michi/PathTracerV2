@@ -68,8 +68,9 @@ void pt::PathTracer::destroy(void)
     this->mtl_buffer.clear();
     for(RenderMaterial& mtl : this->materials)
     {
-        mtl.texture.arman.clear();
+        mtl.texture.albedo.clear();
         mtl.texture.emission.clear();
+        mtl.texture.rman.clear();
     }
     this->environment.clear();
 

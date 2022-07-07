@@ -8,3 +8,7 @@ layout (set = 0, binding = 0, rgba8) uniform image2D rop;
 
 // location (set = 0, binding = 1) contains the top level acceleration structure
 layout (set = 0, binding = 1) uniform accelerationStructureNV tlas;
+
+// The closest hit and the miss shader can return some values via the payload.
+// This payload uses the location 0.
+layout (location = 0) rayPayloadNV payload_t payload;

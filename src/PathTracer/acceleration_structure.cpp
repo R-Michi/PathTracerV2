@@ -53,7 +53,7 @@ void pt::PathTracer::load_instances(const AccelerationStructure& blas)
 {
     // there is only one instance of the blas
     VkAccelerationStructureInstanceNV instance;
-    instance.transform = glm2transformNV(glm2::mat4(1.0f));
+    instance.transform = glm2transformNV(identity_transform());
     instance.flags = VK_GEOMETRY_INSTANCE_FORCE_OPAQUE_BIT_NV;
     instance.mask = 0xFF;
     instance.instanceCustomIndex = 0;   // instanceID of this geometry is 0

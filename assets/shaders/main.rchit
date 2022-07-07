@@ -4,7 +4,11 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_scalar_block_layout : enable
 
+#include "types.glsl"
+#include "layout_rchit.glsl"
+#include "common_rchit.glsl"
+
 void main()
 {
-    
+    payload.color = vec3(0.2f, 0.2f, 0.2f);
 }
